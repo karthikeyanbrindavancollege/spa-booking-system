@@ -69,11 +69,18 @@ export function DetailsForm({
 
     setIsAutoDetecting(true)
     try {
-      // @ts-ignore - Web OTP API is not in TypeScript definitions yet
-      const otp = await navigator.credentials.get({
+      // Create abort controller for timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60000) // 1 minute timeout
+      
+      // Use any type to bypass TypeScript limitations for Web OTP API
+      const credentials = navigator.credentials as any
+      const otp = await credentials.get({
         otp: { transport: ['sms'] },
-        signal: AbortSignal.timeout(60000) // 1 minute timeout
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
       
       if (otp && otp.code) {
         setVerificationCode(otp.code)
