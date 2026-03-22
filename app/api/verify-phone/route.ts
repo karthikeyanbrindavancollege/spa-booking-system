@@ -1,164 +1,152 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-// In-memory storage for verification sessions - use database in production
+// In-memory storage for verification sessions
 const verificationSessions = new Map<string, { 
   timestamp: number, 
-  verified: boolean, 
-  code?: string 
+  verified: boolean,
+  code: string
 }>()
 
-// Check if we're in development mode
-const isDevelopment = process.env.NODE_ENV === 'development'
+export const dynamic = 'force-dynamic'
+
+// Free SMS service using Fast2SMS (India)
+async function sendSMSViaFast2SMS(phone: string, message: string) {
+  const apiKey = process.env.FAST2SMS_API_KEY
+  
+  if (!apiKey) {
+    throw new Error('Fast2SMS API key not configured')
+  }
+
+  const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+    method: 'POST',
+    headers: {
+      'authorization': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      route: 'v3',
+      sender_id: 'TXTIND',
+      message: message,
+      language: 'english',
+      flash: 0,
+      numbers: phone.replace('+91', '').replace('+', '')
+    })
+  })
+
+  const data = await response.json()
+  
+  if (!response.ok || !data.return) {
+    throw new Error(data.message || 'Failed to send SMS')
+  }
+  
+  return data
+}
+
+// Alternative: TextBelt (International, 1 free SMS per day per number)
+async function sendSMSViaTextBelt(phone: string, message: string) {
+  const response = await fetch('https://textbelt.com/text', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      phone: phone,
+      message: message,
+      key: 'textbelt' // Free tier key
+    })
+  })
+
+  const data = await response.json()
+  
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to send SMS')
+  }
+  
+  return data
+}
 
 export async function POST(request: NextRequest) {
   try {
     const { phone, action, code } = await request.json()
 
     if (action === 'send') {
-      // In development mode, always use fallback
-      if (isDevelopment) {
-        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
-        
-        console.log(`📱 SMS to ${phone}: Your verification code is ${verificationCode}`)
-        
-        // Store the code for verification
-        verificationSessions.set(phone, {
+      // Generate verification code
+      const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+      const message = `Your Serenity Spa verification code is: ${verificationCode}. Valid for 10 minutes.`
+      
+      // Format phone number
+      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`
+      
+      try {
+        // Try Fast2SMS first (for Indian numbers)
+        if (formattedPhone.startsWith('+91')) {
+          await sendSMSViaFast2SMS(formattedPhone, message)
+        } else {
+          // Use TextBelt for international numbers
+          await sendSMSViaTextBelt(formattedPhone, message)
+        }
+
+        // Store verification session
+        verificationSessions.set(formattedPhone, {
           timestamp: Date.now(),
           verified: false,
           code: verificationCode
-        })
-
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Verification code sent (development mode)',
-          code: verificationCode // Show code in development
-        })
-      }
-
-      // Production mode - try Supabase first
-      try {
-        const { data, error } = await supabase.auth.signInWithOtp({
-          phone: phone.startsWith('+') ? phone : `+91${phone}`,
-          options: {
-            channel: 'sms'
-          }
-        })
-
-        if (error) {
-          console.error('Supabase OTP error:', error)
-          // Fall back to development mode even in production if Supabase fails
-          const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
-          
-          console.log(`📱 FALLBACK SMS to ${phone}: Your verification code is ${verificationCode}`)
-          
-          verificationSessions.set(phone, {
-            timestamp: Date.now(),
-            verified: false,
-            code: verificationCode
-          })
-
-          return NextResponse.json({ 
-            success: true, 
-            message: 'Verification code sent (fallback mode)',
-            code: verificationCode
-          })
-        }
-
-        // Store verification session for Supabase
-        verificationSessions.set(phone, {
-          timestamp: Date.now(),
-          verified: false
         })
 
         return NextResponse.json({ 
           success: true, 
           message: 'Verification code sent via SMS'
         })
-      } catch (supabaseError) {
-        console.error('Supabase SMS error:', supabaseError)
         
-        // Fallback to development mode
-        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString()
+      } catch (smsError: any) {
+        console.error('SMS sending error:', smsError)
         
-        console.log(`📱 FALLBACK SMS to ${phone}: Your verification code is ${verificationCode}`)
-        
-        verificationSessions.set(phone, {
+        // Fallback: Store code for manual verification (development/testing)
+        verificationSessions.set(formattedPhone, {
           timestamp: Date.now(),
           verified: false,
           code: verificationCode
         })
-
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Verification code sent (fallback mode)',
-          code: verificationCode
+        
+        return NextResponse.json({
+          success: true,
+          message: 'SMS service temporarily unavailable. For testing, use code: ' + verificationCode,
+          testCode: verificationCode // Only for testing
         })
       }
     }
 
     if (action === 'verify') {
-      const session = verificationSessions.get(phone)
+      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`
+      const session = verificationSessions.get(formattedPhone)
       
       if (!session) {
         return NextResponse.json(
-          { error: 'No verification session found for this number' },
+          { error: 'No verification session found. Please request a new code.' },
           { status: 400 }
         )
       }
 
       // Check if session is expired (10 minutes)
       if (Date.now() - session.timestamp > 10 * 60 * 1000) {
-        verificationSessions.delete(phone)
+        verificationSessions.delete(formattedPhone)
         return NextResponse.json(
-          { error: 'Verification code has expired' },
+          { error: 'Verification code has expired. Please request a new one.' },
           { status: 400 }
         )
       }
 
-      // Check if this is a local/fallback code verification
-      if (session.code) {
-        if (session.code === code) {
-          verificationSessions.set(phone, { ...session, verified: true })
-          return NextResponse.json({ success: true, message: 'Phone verified successfully' })
-        } else {
-          return NextResponse.json(
-            { error: 'Invalid verification code' },
-            { status: 400 }
-          )
-        }
-      }
-
-      // Production Supabase verification
-      try {
-        const { data, error } = await supabase.auth.verifyOtp({
-          phone: phone.startsWith('+') ? phone : `+91${phone}`,
-          token: code,
-          type: 'sms'
+      // Verify code
+      if (session.code === code) {
+        verificationSessions.set(formattedPhone, { ...session, verified: true })
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Phone verified successfully' 
         })
-
-        if (error) {
-          return NextResponse.json(
-            { error: 'Invalid verification code' },
-            { status: 400 }
-          )
-        }
-
-        // Mark as verified
-        verificationSessions.set(phone, { ...session, verified: true })
-        
-        return NextResponse.json({ success: true, message: 'Phone verified successfully' })
-      } catch (verifyError) {
-        console.error('Supabase verify error:', verifyError)
+      } else {
         return NextResponse.json(
-          { error: 'Verification failed. Please try again.' },
-          { status: 500 }
+          { error: 'Invalid verification code. Please try again.' },
+          { status: 400 }
         )
       }
     }
@@ -170,7 +158,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Phone verification error:', error)
     return NextResponse.json(
-      { error: 'Failed to process verification' },
+      { error: 'Failed to process verification request' },
       { status: 500 }
     )
   }

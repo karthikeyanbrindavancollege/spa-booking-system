@@ -56,16 +56,16 @@ export default function ContactForm({ onClose }: ContactFormProps) {
       const data = await response.json()
       
       if (response.ok) {
-        setSentCode(data.code) // For demo - remove in production
         setShowVerification(true)
-        if (data.code) {
-          alert(`Verification code sent to ${phone}. Development Code: ${data.code}`)
-          console.log(`📱 Verification code for ${phone}: ${data.code}`)
+        if (data.testCode) {
+          alert(`Verification code sent to ${phone}. Test Code: ${data.testCode}`)
         } else {
           alert(`Verification code sent to ${phone}`)
         }
       } else {
-        throw new Error(data.error || 'Failed to send verification code')
+        const errorData = await response.json()
+        alert(errorData.error || 'Failed to send verification code')
+        throw new Error(errorData.error || 'Failed to send verification code')
       }
     } catch (error) {
       alert('Failed to send verification code. Please try again.')
@@ -214,11 +214,6 @@ export default function ContactForm({ onClose }: ContactFormProps) {
               <label htmlFor="verification" className="block text-sm font-medium text-gray-700">
                 Enter Verification Code
               </label>
-              {process.env.NODE_ENV === 'development' && (
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  DEV MODE
-                </span>
-              )}
             </div>
             <div className="flex gap-2">
               <input
@@ -239,10 +234,7 @@ export default function ContactForm({ onClose }: ContactFormProps) {
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-600">
-              {process.env.NODE_ENV === 'development' 
-                ? 'In development mode, check the alert or browser console for the verification code'
-                : 'Check your SMS for the verification code'
-              }
+              Check your SMS for the verification code. It may take a few moments to arrive.
             </p>
           </div>
         )}

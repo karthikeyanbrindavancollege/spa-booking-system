@@ -91,13 +91,15 @@ export function DetailsForm({
       if (response.ok) {
         setShowVerification(true)
         addToast(`Verification code sent to ${mobile}`, 'success')
-        // Show demo code in development/fallback mode
-        if (data.code) {
-          addToast(`Development Code: ${data.code}`, 'info')
-          console.log(`📱 Verification code for ${mobile}: ${data.code}`)
+        
+        // Show test code if SMS service is unavailable
+        if (data.testCode) {
+          addToast(`Test Code: ${data.testCode}`, 'info')
         }
       } else {
-        throw new Error(data.error || 'Failed to send verification code')
+        const errorData = await response.json()
+        addToast(errorData.error || 'Failed to send verification code', 'error')
+        throw new Error(errorData.error || 'Failed to send verification code')
       }
     } catch (error) {
       addToast('Failed to send verification code. Please try again.', 'error')
@@ -363,11 +365,6 @@ export function DetailsForm({
               <label htmlFor="verification" className="block text-sm font-medium text-gray-700">
                 Enter Verification Code
               </label>
-              {process.env.NODE_ENV === 'development' && (
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                  DEV MODE
-                </span>
-              )}
             </div>
             <div className="flex gap-2">
               <input
@@ -388,10 +385,7 @@ export function DetailsForm({
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-600">
-              {process.env.NODE_ENV === 'development' 
-                ? 'In development mode, check the browser console or toast notification for the verification code'
-                : 'Check your SMS for the verification code'
-              }
+              Check your SMS for the verification code. It may take a few moments to arrive.
             </p>
           </div>
         )}
