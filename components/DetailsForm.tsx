@@ -58,11 +58,13 @@ export function DetailsForm({
 
   // Check if browser supports Web OTP API
   useEffect(() => {
-    if ('OTPCredential' in window) {
-      setSupportsWebOTP(true)
-    }
+    // Temporarily disabled
+    // if ('OTPCredential' in window) {
+    //   setSupportsWebOTP(true)
+    // }
   }, [])
 
+  /* COMMENTED OUT - Auto-detection temporarily disabled
   // Auto-detect SMS codes using Web OTP API
   const startAutoDetection = async () => {
     if (!supportsWebOTP) return
@@ -121,6 +123,7 @@ export function DetailsForm({
       addToast('Verification failed. Please try again.', 'error')
     }
   }
+  */
 
   const {
     register,
@@ -144,6 +147,11 @@ export function DetailsForm({
       return
     }
 
+    // Temporarily disable verification - auto-approve mobile numbers
+    setIsMobileVerified(true)
+    addToast('Mobile number accepted (verification temporarily disabled)', 'success')
+    
+    /* COMMENTED OUT - Mobile verification temporarily disabled
     setIsVerifying(true)
     try {
       const response = await fetch('/api/verify-phone', {
@@ -185,6 +193,7 @@ export function DetailsForm({
     } finally {
       setIsVerifying(false)
     }
+    */
   }
 
   const verifyCode = async () => {
@@ -437,7 +446,8 @@ export function DetailsForm({
           </p>
         </div>
 
-        {/* Verification Code Input */}
+        {/* Verification Code Input - TEMPORARILY DISABLED */}
+        {/* 
         {showVerification && (
           <div className="card bg-yellow-50 border-yellow-200">
             <div className="flex items-center justify-between mb-2">
@@ -482,6 +492,7 @@ export function DetailsForm({
             </p>
           </div>
         )}
+        */}
 
         {/* Notes */}
         <div className="card">
