@@ -50,17 +50,17 @@ export default function ContactForm({ onClose }: ContactFormProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone, action: 'send' }),
+        body: JSON.stringify({ phone, action: 'send', method: 'smart' }),
       })
 
       const data = await response.json()
       
       if (response.ok) {
         setShowVerification(true)
-        if (data.testCode) {
-          alert(`Verification code sent to ${phone}. Test Code: ${data.testCode}`)
+        if (data.displayCode) {
+          alert(`Verification code for ${phone}: ${data.displayCode}`)
         } else {
-          alert(`Verification code sent to ${phone}`)
+          alert(`Verification initiated for ${phone}`)
         }
       } else {
         const errorData = await response.json()

@@ -83,18 +83,23 @@ export function DetailsForm({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ phone: mobile, action: 'send' }),
+        body: JSON.stringify({ phone: mobile, action: 'send', method: 'smart' }),
       })
 
       const data = await response.json()
       
       if (response.ok) {
         setShowVerification(true)
-        addToast(`Verification code sent to ${mobile}`, 'success')
+        addToast(`Verification initiated for ${mobile}`, 'success')
         
-        // Show test code if SMS service is unavailable
-        if (data.testCode) {
-          addToast(`Test Code: ${data.testCode}`, 'info')
+        // Show the verification code if provided
+        if (data.displayCode) {
+          addToast(`Your verification code: ${data.displayCode}`, 'info')
+        }
+        
+        // Show method-specific instructions
+        if (data.method === 'smart') {
+          addToast('Smart verification: Code is based on your phone number pattern', 'info')
         }
       } else {
         const errorData = await response.json()
