@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import { createClient } from '@supabase/supabase-js'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 // In a real application, you would store this in a database or Redis
 const verificationCodes = new Map<string, { code: string, timestamp: number }>()
@@ -21,27 +24,27 @@ export async function POST(request: NextRequest) {
       })
 
       try {
-        // Send verification email
-        await resend.emails.send({
-          from: 'Verification <noreply@yourdomain.com>',
-          to: [email],
+        // Store verification email in Supabase instead of sending
+        const verificationNotification = {
+          type: 'customer_confirmation',
+          recipient_email: email,
+          recipient_name: 'User',
           subject: 'Email Verification Code',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Email Verification</h2>
-              
-              <p>Your verification code is:</p>
-              
-              <div style="background: #f0f8ff; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-                <h1 style="color: #0066cc; font-size: 32px; margin: 0; letter-spacing: 4px;">${verificationCode}</h1>
-              </div>
-              
-              <p>This code will expire in 10 minutes.</p>
-              
-              <p>If you didn't request this verification, please ignore this email.</p>
-            </div>
+          content: `
+Your verification code is: ${verificationCode}
+
+This code will expire in 10 minutes.
+
+If you didn't request this verification, please ignore this email.
           `,
-        })
+          booking_id: null,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }
+
+        await supabase
+          .from('email_notifications')
+          .insert(verificationNotification)
 
         return NextResponse.json({ 
           success: true, 
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
           code: verificationCode
         })
       } catch (emailError) {
-        console.error('Email sending failed:', emailError)
+        console.error('Email notification creation failed:', emailError)
         // Fallback for demo - in production, you'd return an error
         return NextResponse.json({ 
           success: true, 
