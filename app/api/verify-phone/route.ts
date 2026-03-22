@@ -102,7 +102,7 @@ class MobileVerificationSystem {
     }
   }
   
-  // Method 5: Smart verification (pattern-based)
+  // Method 5: Smart verification (pattern-based) with Web OTP format
   static async initiateSmartVerification(phone: string, code: string) {
     // Use phone number patterns and user behavior to verify
     // This is useful for demo/testing environments
@@ -113,12 +113,20 @@ class MobileVerificationSystem {
     // Create a predictable but secure verification method
     const smartCode = this.generateSmartCode(phoneDigits)
     
+    // Format message for Web OTP API compatibility
+    const message = `Your Serenity Spa verification code is: ${smartCode}
+
+@serenity-free-spa.netlify.app #${smartCode}`
+    
     console.log(`🧠 Smart verification for ${phone}: Use code ${smartCode}`)
+    console.log(`📱 SMS message format: ${message}`)
+    
     return {
       success: true,
       method: 'smart',
       code: smartCode,
-      message: 'Use the smart verification code displayed'
+      message: 'Use the smart verification code displayed',
+      smsMessage: message
     }
   }
   

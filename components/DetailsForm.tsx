@@ -48,11 +48,72 @@ export function DetailsForm({
   const [verificationCode, setVerificationCode] = useState('')
   const [isMobileVerified, setIsMobileVerified] = useState(false)
   const [showVerification, setShowVerification] = useState(false)
+  const [isAutoDetecting, setIsAutoDetecting] = useState(false)
+  const [supportsWebOTP, setSupportsWebOTP] = useState(false)
   const [locationError, setLocationError] = useState<string>('')
   const [clientPhoto, setClientPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string>('')
   const [photoError, setPhotoError] = useState<string>('')
   const { addToast } = useToast()
+
+  // Check if browser supports Web OTP API
+  useEffect(() => {
+    if ('OTPCredential' in window) {
+      setSupportsWebOTP(true)
+    }
+  }, [])
+
+  // Auto-detect SMS codes using Web OTP API
+  const startAutoDetection = async () => {
+    if (!supportsWebOTP) return
+
+    setIsAutoDetecting(true)
+    try {
+      // @ts-ignore - Web OTP API is not in TypeScript definitions yet
+      const otp = await navigator.credentials.get({
+        otp: { transport: ['sms'] },
+        signal: AbortSignal.timeout(60000) // 1 minute timeout
+      })
+      
+      if (otp && otp.code) {
+        setVerificationCode(otp.code)
+        addToast('SMS code auto-detected!', 'success')
+        // Auto-verify the code
+        await verifyCodeWithValue(otp.code)
+      }
+    } catch (error) {
+      console.log('Auto-detection failed or cancelled:', error)
+    } finally {
+      setIsAutoDetecting(false)
+    }
+  }
+
+  // Verify code with a specific value (for auto-detection)
+  const verifyCodeWithValue = async (codeValue: string) => {
+    const mobile = getValues('mobile')
+    
+    try {
+      const response = await fetch('/api/verify-phone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone: mobile, action: 'verify', code: codeValue }),
+      })
+
+      const data = await response.json()
+      
+      if (response.ok) {
+        setIsMobileVerified(true)
+        setShowVerification(false)
+        addToast('Mobile number verified successfully!', 'success')
+      } else {
+        addToast(data.error || 'Invalid verification code. Please try again.', 'error')
+      }
+    } catch (error) {
+      addToast('Verification failed. Please try again.', 'error')
+    }
+  }
 
   const {
     register,
@@ -100,6 +161,12 @@ export function DetailsForm({
         // Show method-specific instructions
         if (data.method === 'smart') {
           addToast('Smart verification: Code is based on your phone number pattern', 'info')
+        }
+
+        // Start auto-detection if supported
+        if (supportsWebOTP) {
+          addToast('Auto-detection enabled - SMS codes will be detected automatically', 'info')
+          startAutoDetection()
         }
       } else {
         const errorData = await response.json()
@@ -370,6 +437,17 @@ export function DetailsForm({
               <label htmlFor="verification" className="block text-sm font-medium text-gray-700">
                 Enter Verification Code
               </label>
+              {isAutoDetecting && (
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded flex items-center gap-1">
+                  <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Auto-detecting...
+                </span>
+              )}
+              {supportsWebOTP && !isAutoDetecting && (
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                  📱 Auto-detect enabled
+                </span>
+              )}
             </div>
             <div className="flex gap-2">
               <input
@@ -390,7 +468,10 @@ export function DetailsForm({
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-600">
-              Check your SMS for the verification code. It may take a few moments to arrive.
+              {supportsWebOTP 
+                ? '📱 SMS codes will be auto-detected on supported browsers. You can also enter manually.'
+                : 'Check your SMS for the verification code. It may take a few moments to arrive.'
+              }
             </p>
           </div>
         )}
