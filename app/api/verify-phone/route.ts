@@ -17,6 +17,10 @@ async function sendSMSViaFast2SMS(phone: string, message: string) {
     throw new Error('Fast2SMS API key not configured')
   }
 
+  console.log('Attempting Fast2SMS with phone:', phone)
+  
+  const cleanPhone = phone.replace('+91', '').replace('+', '')
+  
   const response = await fetch('https://www.fast2sms.com/dev/bulkV2', {
     method: 'POST',
     headers: {
@@ -29,14 +33,15 @@ async function sendSMSViaFast2SMS(phone: string, message: string) {
       message: message,
       language: 'english',
       flash: 0,
-      numbers: phone.replace('+91', '').replace('+', '')
+      numbers: cleanPhone
     })
   })
 
   const data = await response.json()
+  console.log('Fast2SMS response:', data)
   
   if (!response.ok || !data.return) {
-    throw new Error(data.message || 'Failed to send SMS')
+    throw new Error(data.message || 'Failed to send SMS via Fast2SMS')
   }
   
   return data
@@ -78,13 +83,30 @@ export async function POST(request: NextRequest) {
       const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`
       
       try {
-        // Try Fast2SMS first (for Indian numbers)
+        // Try Fast2SMS first (for Indian numbers) since it's configured
         if (formattedPhone.startsWith('+91')) {
-          await sendSMSViaFast2SMS(formattedPhone, message)
-        } else {
-          // Use TextBelt for international numbers
-          await sendSMSViaTextBelt(formattedPhone, message)
+          try {
+            await sendSMSViaFast2SMS(formattedPhone, message)
+            
+            // Store verification session
+            verificationSessions.set(formattedPhone, {
+              timestamp: Date.now(),
+              verified: false,
+              code: verificationCode
+            })
+
+            return NextResponse.json({ 
+              success: true, 
+              message: 'Verification code sent via SMS'
+            })
+          } catch (fast2smsError: any) {
+            console.error('Fast2SMS error:', fast2smsError)
+            // Continue to try TextBelt as backup
+          }
         }
+        
+        // Try TextBelt as backup (works for all numbers)
+        await sendSMSViaTextBelt(formattedPhone, message)
 
         // Store verification session
         verificationSessions.set(formattedPhone, {
@@ -99,7 +121,7 @@ export async function POST(request: NextRequest) {
         })
         
       } catch (smsError: any) {
-        console.error('SMS sending error:', smsError)
+        console.error('All SMS services failed:', smsError)
         
         // Fallback: Store code for manual verification (development/testing)
         verificationSessions.set(formattedPhone, {
