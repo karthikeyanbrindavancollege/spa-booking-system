@@ -623,7 +623,7 @@ export function DetailsForm({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !isMobileVerified || !location?.address || !clientPhoto}
+            disabled={isSubmitting || !location?.address || !clientPhoto}
             className="flex-1 btn-primary"
           >
             {isSubmitting ? (
