@@ -256,10 +256,11 @@ export function DetailsForm({
   }
 
   const onFormSubmit = async (data: z.infer<typeof bookingSchema>) => {
-    if (!isMobileVerified) {
-      addToast('Please verify your mobile number first', 'error')
-      return
-    }
+    // COMMENTED OUT - Mobile verification temporarily disabled
+    // if (!isMobileVerified) {
+    //   addToast('Please verify your mobile number first', 'error')
+    //   return
+    // }
 
     if (!location || !location.address) {
       setLocationError('Please select your location')
