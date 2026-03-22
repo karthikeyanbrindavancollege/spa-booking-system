@@ -415,11 +415,27 @@ export function DetailsForm({
           </p>
         </div>
 
-        {/* Mobile Number */}
+        {/* Mobile Number - Verification Temporarily Disabled */}
         <div className="card">
           <label htmlFor="mobile" className="block text-sm font-medium text-gray-700 mb-2">
             Mobile Number *
           </label>
+          {/* Simple input without verification button */}
+          <input
+            {...register('mobile')}
+            type="tel"
+            id="mobile"
+            className="input-field"
+            placeholder="Enter your mobile number"
+          />
+          {errors.mobile && (
+            <p className="mt-1 text-sm text-red-600">{errors.mobile.message}</p>
+          )}
+          <p className="mt-1 text-xs text-gray-500">
+            We'll use this to send booking confirmations and updates
+          </p>
+          
+          {/* COMMENTED OUT - Verification button temporarily disabled
           <div className="flex gap-2">
             <input
               {...register('mobile')}
@@ -438,12 +454,7 @@ export function DetailsForm({
               {isMobileVerified ? '✓ Verified' : isVerifying ? 'Sending...' : 'Verify'}
             </button>
           </div>
-          {errors.mobile && (
-            <p className="mt-1 text-sm text-red-600">{errors.mobile.message}</p>
-          )}
-          <p className="mt-1 text-xs text-gray-500">
-            We'll use this to send booking confirmations and updates
-          </p>
+          */}
         </div>
 
         {/* Verification Code Input - TEMPORARILY DISABLED */}
