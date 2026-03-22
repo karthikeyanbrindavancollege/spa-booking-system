@@ -246,14 +246,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (action === 'resend') {
-      // Allow resending with different method
-      return await this.POST(new NextRequest(request.url, {
-        method: 'POST',
-        body: JSON.stringify({ phone, action: 'send', method })
-      }))
-    }
-
     return NextResponse.json(
       { error: 'Invalid action' },
       { status: 400 }
