@@ -32,7 +32,8 @@ class MobileVerificationSystem {
     return {
       success: true,
       method: 'call',
-      message: 'You will receive a call with your verification code'
+      message: 'You will receive a call with your verification code',
+      code: code
     }
   }
   
@@ -46,7 +47,8 @@ class MobileVerificationSystem {
     return {
       success: true,
       method: 'whatsapp',
-      message: 'Check your WhatsApp for the verification code'
+      message: 'Check your WhatsApp for the verification code',
+      code: code
     }
   }
   
@@ -65,7 +67,8 @@ class MobileVerificationSystem {
     return {
       success: true,
       method: 'email-sms',
-      message: 'Verification code sent via carrier gateway'
+      message: 'Verification code sent via carrier gateway',
+      code: code
     }
   }
   
@@ -85,14 +88,16 @@ class MobileVerificationSystem {
       return {
         success: true,
         method: 'manual',
-        message: 'Your verification request has been submitted for manual review'
+        message: 'Your verification request has been submitted for manual review',
+        code: code
       }
     } catch (error) {
       console.log('Manual verification logged:', { phone, code })
       return {
         success: true,
         method: 'manual',
-        message: 'Verification request logged for manual processing'
+        message: 'Verification request logged for manual processing',
+        code: code
       }
     }
   }
@@ -166,10 +171,11 @@ export async function POST(request: NextRequest) {
       }
       
       // Store verification session
+      const finalCode = result.code || verificationCode
       verificationSessions.set(formattedPhone, {
         timestamp: Date.now(),
         verified: false,
-        code: result.code || verificationCode,
+        code: finalCode,
         attempts: 0,
         method: result.method
       })
@@ -178,7 +184,7 @@ export async function POST(request: NextRequest) {
         success: true, 
         message: result.message,
         method: result.method,
-        ...(result.code && { displayCode: result.code }),
+        ...(finalCode && selectedMethod === 'smart' && { displayCode: finalCode }),
         hint: selectedMethod === 'smart' ? 'Code is based on your phone number pattern' : undefined
       })
     }
