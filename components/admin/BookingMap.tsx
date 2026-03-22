@@ -1,18 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useEffect, useRef, useState } from 'react'
 import { Booking } from '@/lib/types'
 import { formatDisplayDate, formatTime } from '@/lib/utils'
-
-// Fix for default markers in Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-})
 
 interface BookingMapProps {
   bookings: Booking[]
@@ -20,11 +10,38 @@ interface BookingMapProps {
 }
 
 export function BookingMap({ bookings, height = 400 }: BookingMapProps) {
-  const mapRef = useRef<L.Map | null>(null)
+  const mapRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isClient, setIsClient] = useState(false)
+  const [L, setL] = useState<any>(null)
 
   useEffect(() => {
-    if (!containerRef.current || bookings.length === 0) return
+    setIsClient(true)
+    
+    // Dynamically import Leaflet only on client side
+    const loadLeaflet = async () => {
+      try {
+        const leaflet = await import('leaflet')
+        
+        // Fix for default markers in Leaflet
+        delete (leaflet.default.Icon.Default.prototype as any)._getIconUrl
+        leaflet.default.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        })
+        
+        setL(leaflet.default)
+      } catch (error) {
+        console.error('Failed to load Leaflet:', error)
+      }
+    }
+    
+    loadLeaflet()
+  }, [])
+
+  useEffect(() => {
+    if (!containerRef.current || !L || !isClient || bookings.length === 0) return
 
     // Initialize map
     const map = L.map(containerRef.current).setView([40.7128, -74.0060], 10)
@@ -34,7 +51,7 @@ export function BookingMap({ bookings, height = 400 }: BookingMapProps) {
     }).addTo(map)
 
     // Add markers for each booking
-    const markers: L.Marker[] = []
+    const markers: any[] = []
     bookings.forEach((booking) => {
       if (booking.latitude && booking.longitude) {
         const marker = L.marker([booking.latitude, booking.longitude]).addTo(map)
@@ -66,9 +83,22 @@ export function BookingMap({ bookings, height = 400 }: BookingMapProps) {
     mapRef.current = map
 
     return () => {
-      map.remove()
+      if (map) {
+        map.remove()
+      }
     }
-  }, [bookings])
+  }, [bookings, L, isClient])
+
+  if (!isClient) {
+    return (
+      <div 
+        className="bg-gray-100 rounded-lg flex items-center justify-center"
+        style={{ height: `${height}px` }}
+      >
+        <div className="text-gray-500">Loading map...</div>
+      </div>
+    )
+  }
 
   if (bookings.length === 0) {
     return (

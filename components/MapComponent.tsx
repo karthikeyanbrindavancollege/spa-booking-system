@@ -1,16 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-
-// Fix for default markers in Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-})
+import { useEffect, useRef, useState } from 'react'
 
 interface MapComponentProps {
   coordinates: { lat: number; lng: number } | null
@@ -18,12 +8,39 @@ interface MapComponentProps {
 }
 
 export default function MapComponent({ coordinates, onMapClick }: MapComponentProps) {
-  const mapRef = useRef<L.Map | null>(null)
-  const markerRef = useRef<L.Marker | null>(null)
+  const mapRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [isClient, setIsClient] = useState(false)
+  const [L, setL] = useState<any>(null)
 
   useEffect(() => {
-    if (!containerRef.current) return
+    setIsClient(true)
+    
+    // Dynamically import Leaflet only on client side
+    const loadLeaflet = async () => {
+      try {
+        const leaflet = await import('leaflet')
+        
+        // Fix for default markers in Leaflet
+        delete (leaflet.default.Icon.Default.prototype as any)._getIconUrl
+        leaflet.default.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        })
+        
+        setL(leaflet.default)
+      } catch (error) {
+        console.error('Failed to load Leaflet:', error)
+      }
+    }
+    
+    loadLeaflet()
+  }, [])
+
+  useEffect(() => {
+    if (!containerRef.current || !L || !isClient) return
 
     // Clear any existing map instance
     if (mapRef.current) {
@@ -33,7 +50,7 @@ export default function MapComponent({ coordinates, onMapClick }: MapComponentPr
 
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
-      if (!containerRef.current) return
+      if (!containerRef.current || !L) return
 
       try {
         // Initialize map centered on Bangalore
@@ -55,7 +72,7 @@ export default function MapComponent({ coordinates, onMapClick }: MapComponentPr
         }).addTo(map)
 
         // Handle map clicks
-        map.on('click', (e) => {
+        map.on('click', (e: any) => {
           const { lat, lng } = e.latlng
           onMapClick(lat, lng)
         })
@@ -84,10 +101,10 @@ export default function MapComponent({ coordinates, onMapClick }: MapComponentPr
         mapRef.current = null
       }
     }
-  }, [onMapClick])
+  }, [onMapClick, L, isClient])
 
   useEffect(() => {
-    if (!mapRef.current) return
+    if (!mapRef.current || !L) return
 
     try {
       if (coordinates) {
@@ -113,7 +130,15 @@ export default function MapComponent({ coordinates, onMapClick }: MapComponentPr
     } catch (error) {
       console.error('Map marker error:', error)
     }
-  }, [coordinates])
+  }, [coordinates, L])
+
+  if (!isClient) {
+    return (
+      <div className="h-64 w-full rounded-lg bg-gray-100 flex items-center justify-center">
+        <div className="text-gray-500">Loading map...</div>
+      </div>
+    )
+  }
 
   return (
     <div 

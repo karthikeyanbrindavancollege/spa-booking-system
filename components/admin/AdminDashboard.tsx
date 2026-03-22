@@ -97,7 +97,7 @@ export function AdminDashboard() {
               onClick={() => setCurrentView('bookings')}
               className={`pb-2 border-b-2 transition-colors whitespace-nowrap text-sm md:text-base ${
                 currentView === 'bookings'
-                  ? 'border-primary-600 text-primary-600'
+                  ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -107,7 +107,7 @@ export function AdminDashboard() {
               onClick={() => setCurrentView('availability')}
               className={`pb-2 border-b-2 transition-colors whitespace-nowrap text-sm md:text-base ${
                 currentView === 'availability'
-                  ? 'border-primary-600 text-primary-600'
+                  ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
